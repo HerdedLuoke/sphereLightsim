@@ -15,3 +15,4 @@ this hasnt been tested for window sizes other than 700 square, no reason they sh
 backGroundColor
 color...
 
+it CAN render multiple but cant handle the concept that light doesnt pass through objects onto others
