@@ -2,6 +2,8 @@ whos gonna eat the meats
 
  use up/down key to move light on the z axis, top left shows ur z axis cord. starts (radius) away
 
+it CAN render multiple balls but cant handle the concept that light doesnt pass through objects onto others
+ multiple lights is not supported rn
 # settings pay attention to me 
 
 gridAccuracy 
@@ -15,4 +17,4 @@ this hasnt been tested for window sizes other than 700 square, no reason they sh
 backGroundColor
 color...
 
-it CAN render multiple but cant handle the concept that light doesnt pass through objects onto others
+
