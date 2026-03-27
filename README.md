@@ -4,9 +4,11 @@ whos gonna eat the meats
 
 it CAN render multiple balls but cant handle the concept that light doesnt pass through objects onto others
  multiple lights is not supported rn
+
+ can render a z plane aswell. placed at -300 by def
 # settings pay attention to me 
 
-can render a z plane aswell. placed at -300 by def
+
 gridAccuracy 
 1 is most quality
 
