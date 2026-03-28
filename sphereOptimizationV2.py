@@ -7,6 +7,38 @@ import time
 # whos gonna eat the meats
 # lucas s,
 # true 3d rewrite to create... clipping. yay!
+# benchmarked cache building to be 32x faster for the sphere and 8x faster for a plane vs non numpy
+
+
+def getWorldPoints(myObject):
+    # all relative to origin
+    worldXArray = myObject.localXArray + myObject.xLocation
+    worldYArray = myObject.localYArray + myObject.yLocation
+    worldZArray = myObject.localZArray + myObject.zLocation
+
+    return worldXArray, worldYArray, worldZArray
+
+
+def getCameraPoints(myObject, myCamera):
+    # all relative to origin
+    worldXArray, worldYArray, worldZArray = getWorldPoints(myObject)
+
+    # all relative to camera
+    relativeXArray = worldXArray - myCamera.xLocation
+    relativeYArray = worldYArray - myCamera.yLocation
+    relativeZArray = worldZArray - myCamera.zLocation
+
+    return relativeXArray, relativeYArray, relativeZArray
+
+
+def getScreenPoints(relativeXArray, relativeYArray, relativeZArray, screenCenterX, screenCenterY, focalLength):
+    validPoint = relativeZArray > 0
+
+    # all relative to screen center
+    screenXArray = screenCenterX + ((relativeXArray[validPoint] / relativeZArray[validPoint]) * focalLength)
+    screenYArray = screenCenterY - ((relativeYArray[validPoint] / relativeZArray[validPoint]) * focalLength)
+
+    return screenXArray, screenYArray, validPoint
 
 
 class lightObject:
@@ -78,6 +110,7 @@ class sphereObject:
         radiusSquared = self.radius ** 2
         gridAccuracy = self.world.gridAccuracy
 
+        # all relative to object
         xDistances = numpy.arange(-self.radius, self.radius, gridAccuracy, dtype=numpy.float64)
         yDistances = numpy.arange(-self.radius, self.radius, gridAccuracy, dtype=numpy.float64)
 
@@ -96,7 +129,7 @@ class sphereObject:
 
 class flatPlaneObject:
     def __init__(self, worldPosition, world, textureFile=None):
-        # world position is the physical location relative to world
+        # world position is the physical location relative to origin
         self.position = (worldPosition[0], worldPosition[1], worldPosition[2])
 
         self.xLocation = self.position[0]
@@ -121,7 +154,7 @@ class flatPlaneObject:
     def createPlane(self, width, height, faceOffset=(0, 0, 0), faceRotation=(0, 0, 0)):
         self.width = width
         self.height = height
-
+        # just makes a flat background object
         faceSize = (self.width, self.height)
         self.localXArray, self.localYArray, self.localZArray = self.createFace(faceSize, faceOffset, faceRotation)
 
@@ -133,12 +166,16 @@ class flatPlaneObject:
 
     def createFace(self, faceSize, faceOffset, faceRotation):
         width, height = faceSize
+
+        # all relative to object
         xOffset, yOffset, zOffset = faceOffset
         # offset is for placing MULTIPLE planes within one object, not needed if u dont wanna
+
         xRotation, yRotation, zRotation = faceRotation
 
         gridAccuracy = self.world.gridAccuracy
 
+        # all relative to object
         xDistances = numpy.arange(-(width / 2), width / 2, gridAccuracy, dtype=numpy.float64)
         yDistances = numpy.arange(-(height / 2), height / 2, gridAccuracy, dtype=numpy.float64)
 
@@ -173,7 +210,7 @@ class flatPlaneObject:
         localXArray = localXArray + xOffset
         localYArray = localYArray + yOffset
         localZArray = localZArray + zOffset
-        # moves the face after rotation so it can be placed where needed in world plane
+        # all relative to object after face offset
 
         return localXArray, localYArray, localZArray
 
@@ -190,6 +227,8 @@ def main():
     backGroundColor = "black"
 
     gridAccuracy = 1
+    focalLength = 500
+    # projection scale, basically ^ 
 
     ####################################################
 
@@ -204,7 +243,7 @@ def main():
     myLight = lightObject(100, (windowWidth / 2, windowHeight / 2, 100))
 
     startTime = time.perf_counter()
-    mySphere = sphereObject(100, (windowWidth / 2, windowHeight / 2, 0), myWorld, None)
+    mySphere = sphereObject(100, (windowWidth / 2, windowHeight / 2, 200), myWorld, None)
     endTime = time.perf_counter()
     print("sphere: " + str((endTime) - (startTime)))
 
@@ -213,6 +252,16 @@ def main():
     myPlane.createPlane(windowWidth, 300, faceOffset=(0, 0, 0), faceRotation=(3.14159 / 2, 0, 0))
     endTime = time.perf_counter()
     print("Plane: " + str((endTime) - (startTime)))
+
+    sphereWorldXArray, sphereWorldYArray, sphereWorldZArray = getWorldPoints(mySphere)
+    planeWorldXArray, planeWorldYArray, planeWorldZArray = getWorldPoints(myPlane)
+
+    sphereCameraXArray, sphereCameraYArray, sphereCameraZArray = getCameraPoints(mySphere, myCamera)
+    planeCameraXArray, planeCameraYArray, planeCameraZArray = getCameraPoints(myPlane, myCamera)
+
+    sphereScreenXArray, sphereScreenYArray, sphereValidPoint = getScreenPoints(sphereCameraXArray,sphereCameraYArray,sphereCameraZArray,windowWidth / 2,windowHeight / 2,focalLength)
+
+    planeScreenXArray, planeScreenYArray, planeValidPoint = getScreenPoints(planeCameraXArray,planeCameraYArray,planeCameraZArray,windowWidth / 2,windowHeight / 2,focalLength)
 
     running = True
 
@@ -230,7 +279,7 @@ def main():
     pygame.quit()
 
 
-testingMode = False
+testingMode = True
 if testingMode == True:
     cProfile.run("main()", sort="cumulative")
 else:
