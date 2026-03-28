@@ -54,34 +54,6 @@ class cameraObject:
 class sphereObject:
 
     def __init__(self, radius, worldPosition, world, textureFile=None):
-        self.image = None
-        self.imagePixelArray = None
-
-        self.world = world
-        self.radius = radius
-        self.position = (worldPosition[0], worldPosition[1], worldPosition[2])
-
-        self.xLocation = self.position[0]
-        self.yLocation = self.position[1]
-        self.zLocation = self.position[2]
-
-        
-        self.fullGrid = self.cacheSpherePoints()
-
-        self.localXArray = numpy.array([gridPoint[0] for gridPoint in self.fullGrid], dtype=numpy.float64)
-        self.localYArray = numpy.array([gridPoint[1] for gridPoint in self.fullGrid], dtype=numpy.float64)
-        self.localZArray = numpy.array([gridPoint[2] for gridPoint in self.fullGrid], dtype=numpy.float64)
-
-        if textureFile is not None:
-            self.image = pygame.image.load(textureFile).convert()
-            self.image = pygame.transform.scale(self.image, (int(self.radius * 2), int(self.radius * 2)))
-            # uses 3d array to display all images without losing color depth, 2d is faster by alot, if needed.
-            # converts all to numpy data
-            self.imagePixelArray = pygame.surfarray.array3d(self.image).astype(numpy.float64)
-
-class sphereObject:
-
-    def __init__(self, radius, worldPosition, world, textureFile=None):
         self.radius = radius
         self.position = (worldPosition[0], worldPosition[1], worldPosition[2])
 
@@ -196,8 +168,6 @@ def main():
 
         screen.fill(backGroundColor)
 
-        
-        
 
 
         pygame.display.flip()
