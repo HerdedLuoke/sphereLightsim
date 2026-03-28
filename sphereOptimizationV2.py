@@ -7,7 +7,6 @@ import time
 # whos gonna eat the meats
 # lucas s,
 # true 3d rewrite to create... clipping. yay!
-# benchmarked cache building to be 32x faster for the sphere and 8x faster for a plane vs non numpy
 
 
 def getWorldPoints(myObject):
@@ -31,12 +30,12 @@ def getCameraPoints(myObject, myCamera):
     return relativeXArray, relativeYArray, relativeZArray
 
 
-def getScreenPoints(relativeXArray, relativeYArray, relativeZArray, screenCenterX, screenCenterY, focalLength):
+def getScreenPoints(relativeXArray, relativeYArray, relativeZArray, myCamera):
     validPoint = relativeZArray > 0
 
     # all relative to screen center
-    screenXArray = screenCenterX + ((relativeXArray[validPoint] / relativeZArray[validPoint]) * focalLength)
-    screenYArray = screenCenterY - ((relativeYArray[validPoint] / relativeZArray[validPoint]) * focalLength)
+    screenXArray = myCamera.screenCenterX + ((relativeXArray[validPoint] / relativeZArray[validPoint]) * myCamera.focalLength)
+    screenYArray = myCamera.screenCenterY - ((relativeYArray[validPoint] / relativeZArray[validPoint]) * myCamera.focalLength)
 
     return screenXArray, screenYArray, validPoint
 
@@ -68,12 +67,19 @@ class worldObject:
 
 
 class cameraObject:
-    def __init__(self, cameraPosition):
+    def __init__(self, cameraPosition, focalLength, windowWidth, windowHeight):
         self.position = (cameraPosition[0], cameraPosition[1], cameraPosition[2])
 
         self.xLocation = self.position[0]
         self.yLocation = self.position[1]
         self.zLocation = self.position[2]
+
+        self.focalLength = focalLength
+
+        self.windowWidth = windowWidth
+        self.windowHeight = windowHeight
+        self.screenCenterX = windowWidth / 2
+        self.screenCenterY = windowHeight / 2
 
     def moveCamera(self, cameraPosition):
         self.position = (cameraPosition[0], cameraPosition[1], cameraPosition[2])
@@ -99,7 +105,7 @@ class sphereObject:
         self.image = None
         self.imagePixelArray = None
 
-        if textureFile is not None:
+        if textureFile != None:
             self.image = pygame.image.load(textureFile).convert()
             self.image = pygame.transform.scale(self.image, (int(self.radius * 2), int(self.radius * 2)))
             # uses 3d array to display all images without losing color depth, 2d is faster by alot, if needed.
@@ -114,8 +120,9 @@ class sphereObject:
         xDistances = numpy.arange(-self.radius, self.radius, gridAccuracy, dtype=numpy.float64)
         yDistances = numpy.arange(-self.radius, self.radius, gridAccuracy, dtype=numpy.float64)
 
-        xLocation, yLocation = numpy.meshgrid(xDistances, yDistances, indexing="xy")
-        # meshes two grids together so everything has a set of coordinates. this makes matrix operations using two arrays possible
+        xLocation = numpy.tile(xDistances, len(yDistances))
+        yLocation = numpy.repeat(yDistances, len(xDistances))
+        # creates the same coordinate pair pattern as the old meshgrid+ravel setup
 
         distanceSumSq = (xLocation ** 2) + (yLocation ** 2)
         validPoint = distanceSumSq <= radiusSquared
@@ -140,10 +147,15 @@ class flatPlaneObject:
 
         self.width = None
         self.height = None
+        self.halfWidth = None
+        self.halfHeight = None
 
         self.localXArray = numpy.array([], dtype=numpy.float64)
         self.localYArray = numpy.array([], dtype=numpy.float64)
         self.localZArray = numpy.array([], dtype=numpy.float64)
+
+        self.localUArray = numpy.array([], dtype=numpy.float64)
+        self.localVArray = numpy.array([], dtype=numpy.float64)
 
         self.image = None
         self.imagePixelArray = None
@@ -154,9 +166,11 @@ class flatPlaneObject:
     def createPlane(self, width, height, faceOffset=(0, 0, 0), faceRotation=(0, 0, 0)):
         self.width = width
         self.height = height
+        self.halfWidth = width / 2
+        self.halfHeight = height / 2
         # just makes a flat background object
         faceSize = (self.width, self.height)
-        self.localXArray, self.localYArray, self.localZArray = self.createFace(faceSize, faceOffset, faceRotation)
+        self.localXArray, self.localYArray, self.localZArray, self.localUArray, self.localVArray = self.createFace(faceSize, faceOffset, faceRotation)
 
         if self.image is not None:
             self.image = pygame.transform.scale(self.image, (self.width, self.height))
@@ -166,43 +180,60 @@ class flatPlaneObject:
 
     def createFace(self, faceSize, faceOffset, faceRotation):
         width, height = faceSize
+        halfWidth = width / 2
+        halfHeight = height / 2
 
         # all relative to object
         xOffset, yOffset, zOffset = faceOffset
         # offset is for placing MULTIPLE planes within one object, not needed if u dont wanna
 
-        xRotation, yRotation, zRotation = faceRotation
+        xRotation = faceRotation[0]
+        yRotation = faceRotation[1]
+        zRotation = faceRotation[2]
+
+        cosXRotation = numpy.cos(xRotation)
+        sinXRotation = numpy.sin(xRotation)
+        cosYRotation = numpy.cos(yRotation)
+        sinYRotation = numpy.sin(yRotation)
+        cosZRotation = numpy.cos(zRotation)
+        sinZRotation = numpy.sin(zRotation)
 
         gridAccuracy = self.world.gridAccuracy
 
         # all relative to object
-        xDistances = numpy.arange(-(width / 2), width / 2, gridAccuracy, dtype=numpy.float64)
-        yDistances = numpy.arange(-(height / 2), height / 2, gridAccuracy, dtype=numpy.float64)
+        xDistances = numpy.arange(-halfWidth, halfWidth, gridAccuracy, dtype=numpy.float64)
+        yDistances = numpy.arange(-halfHeight, halfHeight, gridAccuracy, dtype=numpy.float64)
 
-        xLocation, yLocation = numpy.meshgrid(xDistances, yDistances, indexing="xy")
-        # meshes two grids together so everything has a set of coordinates. this makes matrix operations using two arrays possible
+        xLocation = numpy.tile(xDistances, len(yDistances))
+        yLocation = numpy.repeat(yDistances, len(xDistances))
+        # creates the same coordinate pair pattern as the old meshgrid+ravel setup
 
-        localXArray = xLocation.ravel()
-        localYArray = yLocation.ravel()
-        # converts 2d into a 1d ^
+        uLocation = ((xLocation + halfWidth) / width) * (width - 1)
+        vLocation = ((yLocation + halfHeight) / height) * (height - 1)
+
+        localXArray = xLocation
+        localYArray = yLocation
+        localUArray = uLocation
+        localVArray = vLocation
+        # already 1d
 
         localZArray = numpy.zeros_like(localXArray, dtype=numpy.float64)
         # zeros for the same space of the x array
 
-        yRotated = (localYArray * numpy.cos(xRotation)) - (localZArray * numpy.sin(xRotation))
-        zRotated = (localYArray * numpy.sin(xRotation)) + (localZArray * numpy.cos(xRotation))
+        yRotated = (localYArray * cosXRotation) - (localZArray * sinXRotation)
+        zRotated = (localYArray * sinXRotation) + (localZArray * cosXRotation)
         localYArray = yRotated
         localZArray = zRotated
         # rotates the face around the x axis
 
-        xRotated = (localXArray * numpy.cos(yRotation)) + (localZArray * numpy.sin(yRotation))
-        zRotated = -(localXArray * numpy.sin(yRotation)) + (localZArray * numpy.cos(yRotation))
+        xRotated = (localXArray * cosYRotation) + (localZArray * sinYRotation)
+        zRotated = -(localXArray * sinYRotation) + (localZArray * cosYRotation)
         localXArray = xRotated
         localZArray = zRotated
         # rotates the face around the y axis
 
-        xRotated = (localXArray * numpy.cos(zRotation)) - (localYArray * numpy.sin(zRotation))
-        yRotated = (localXArray * numpy.sin(zRotation)) + (localYArray * numpy.cos(zRotation))
+        xRotated = (localXArray * cosZRotation) - (localYArray * sinZRotation)
+        yRotated = (localXArray * sinZRotation) + (localYArray * cosZRotation)
         localXArray = xRotated
         localYArray = yRotated
         # rotates the face around the z axis
@@ -212,7 +243,7 @@ class flatPlaneObject:
         localZArray = localZArray + zOffset
         # all relative to object after face offset
 
-        return localXArray, localYArray, localZArray
+        return localXArray, localYArray, localZArray, localUArray, localVArray
 
 
 def main():
@@ -228,9 +259,11 @@ def main():
 
     gridAccuracy = 1
     focalLength = 500
-    # projection scale, basically ^ 
-
+    # projection
     ####################################################
+
+    screenCenterX = windowWidth / 2
+    screenCenterY = windowHeight / 2
 
     # pygame definitions
     screen = pygame.display.set_mode((windowWidth, windowHeight))
@@ -239,16 +272,16 @@ def main():
 
     # scene objects
     myWorld = worldObject(gridAccuracy)
-    myCamera = cameraObject((windowWidth / 2, windowHeight / 2, 0))
-    myLight = lightObject(100, (windowWidth / 2, windowHeight / 2, 100))
+    myCamera = cameraObject((screenCenterX, screenCenterY, 0), focalLength, windowWidth, windowHeight)
+    myLight = lightObject(100, (screenCenterX, screenCenterY, 100))
 
     startTime = time.perf_counter()
-    mySphere = sphereObject(100, (windowWidth / 2, windowHeight / 2, 200), myWorld, None)
+    mySphere = sphereObject(100, (screenCenterX, screenCenterY, 200), myWorld, None)
     endTime = time.perf_counter()
     print("sphere: " + str((endTime) - (startTime)))
 
     startTime = time.perf_counter()
-    myPlane = flatPlaneObject((windowWidth / 2, windowHeight, 150), myWorld, None)
+    myPlane = flatPlaneObject((screenCenterX, windowHeight, 150), myWorld, None)
     myPlane.createPlane(windowWidth, 300, faceOffset=(0, 0, 0), faceRotation=(3.14159 / 2, 0, 0))
     endTime = time.perf_counter()
     print("Plane: " + str((endTime) - (startTime)))
@@ -259,9 +292,9 @@ def main():
     sphereCameraXArray, sphereCameraYArray, sphereCameraZArray = getCameraPoints(mySphere, myCamera)
     planeCameraXArray, planeCameraYArray, planeCameraZArray = getCameraPoints(myPlane, myCamera)
 
-    sphereScreenXArray, sphereScreenYArray, sphereValidPoint = getScreenPoints(sphereCameraXArray,sphereCameraYArray,sphereCameraZArray,windowWidth / 2,windowHeight / 2,focalLength)
+    sphereScreenXArray, sphereScreenYArray, sphereValidPoint = getScreenPoints(sphereCameraXArray, sphereCameraYArray, sphereCameraZArray, myCamera)
 
-    planeScreenXArray, planeScreenYArray, planeValidPoint = getScreenPoints(planeCameraXArray,planeCameraYArray,planeCameraZArray,windowWidth / 2,windowHeight / 2,focalLength)
+    planeScreenXArray, planeScreenYArray, planeValidPoint = getScreenPoints(planeCameraXArray, planeCameraYArray, planeCameraZArray, myCamera)
 
     running = True
 
@@ -279,7 +312,7 @@ def main():
     pygame.quit()
 
 
-testingMode = True
+testingMode = False
 if testingMode == True:
     cProfile.run("main()", sort="cumulative")
 else:
