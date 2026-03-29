@@ -13,7 +13,7 @@ def main():
 
     backGroundColor = "black"
 
-    gridAccuracy = 10
+    gridAccuracy = 4
     ####################################################
 
     screenCenterX = windowWidth / 2
@@ -35,32 +35,32 @@ def main():
     frontFaceZLocation = cubeCenterZ + halfBoxSize
 
     #front +z
-    frontPlane = flatPlaneObject((cubeCenterX, cubeCenterY, frontFaceZLocation), myWorld)
+    frontPlane = flatPlaneObject((cubeCenterX, cubeCenterY, frontFaceZLocation), myWorld, 5)
     frontPlane.createPlane(boxSize, boxSize, faceRotation=(0, numpy.pi, 0))
     objectList.append(frontPlane)
 
     # back -z
-    backPlane = flatPlaneObject((cubeCenterX, cubeCenterY, frontFaceZLocation - boxSize), myWorld)
+    backPlane = flatPlaneObject((cubeCenterX, cubeCenterY, frontFaceZLocation - boxSize), myWorld, 25)
     backPlane.createPlane(boxSize, boxSize)
     objectList.append(backPlane)
 
     #left -x
-    leftPlane = flatPlaneObject((cubeCenterX - halfBoxSize, cubeCenterY, cubeCenterZ), myWorld)
+    leftPlane = flatPlaneObject((cubeCenterX - halfBoxSize, cubeCenterY, cubeCenterZ), myWorld, 30)
     leftPlane.createPlane(boxSize, boxSize, faceRotation=(0, numpy.pi / 2, 0))
     objectList.append(leftPlane)
 
     # right x
-    rightPlane = flatPlaneObject((cubeCenterX + halfBoxSize, cubeCenterY, cubeCenterZ), myWorld)
+    rightPlane = flatPlaneObject((cubeCenterX + halfBoxSize, cubeCenterY, cubeCenterZ), myWorld, 60)
     rightPlane.createPlane(boxSize, boxSize, faceRotation=(0, -numpy.pi / 2, 0))
     objectList.append(rightPlane)
 
     #top y
-    topPlane = flatPlaneObject((cubeCenterX, cubeCenterY + halfBoxSize, cubeCenterZ), myWorld)
+    topPlane = flatPlaneObject((cubeCenterX, cubeCenterY + halfBoxSize, cubeCenterZ), myWorld, 30)
     topPlane.createPlane(boxSize, boxSize, faceRotation=(numpy.pi / 2, 0, 0))
     objectList.append(topPlane)
 
     #bottom -y
-    bottomPlane = flatPlaneObject((cubeCenterX, cubeCenterY - halfBoxSize, cubeCenterZ), myWorld)
+    bottomPlane = flatPlaneObject((cubeCenterX, cubeCenterY - halfBoxSize, cubeCenterZ), myWorld, 15)
     bottomPlane.createPlane(boxSize, boxSize, faceRotation=(-numpy.pi / 2, 0, 0))
     objectList.append(bottomPlane)
 
