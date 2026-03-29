@@ -36,6 +36,18 @@ def getScreenPoints(relativeXArray, relativeYArray, relativeZArray, myCamera):
 
     return screenXArray, screenYArray, validPoint
 
+def matPlot(meshVertexArray,triangleFaceArray):
+
+    # shamelessly stole this example code so i could make sure my mesh rendered right without writing the lighting system
+    fig = matplotlib.pyplot.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    ax.plot_trisurf(meshVertexArray[:, 0],meshVertexArray[:, 1],meshVertexArray[:, 2],triangles=triangleFaceArray,shade=True,color='w',edgecolor='k',linewidth=0.2)
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    matplotlib.pyplot.show()
+
 class lightObject:
     def __init__(self, intensity, lightPosition):
         self.position = (lightPosition[0], lightPosition[1], lightPosition[2])
@@ -84,7 +96,7 @@ class cameraObject:
         self.zLocation = self.position[2]
 
 class sphereObject:
-
+        # UV STYLE SPHERE GENERATION
     def __init__(self, radius, worldPosition, world, textureFile=None):
         self.radius = radius
         self.position = (worldPosition[0], worldPosition[1], worldPosition[2])
@@ -94,10 +106,10 @@ class sphereObject:
         self.zLocation = self.position[2]
 
         self.world = world
+
         self.cacheSpherePoints()
-        #print(len(self.localXArray))
-        #print(len(self.localYArray))
-        #print(len(self.localZArray))
+        self.createSphereTriangles()
+
         self.image = None
         self.imagePixelArray = None
 
@@ -112,9 +124,13 @@ class sphereObject:
         gridAccuracy = self.world.gridAccuracy
 
         # i hate this.
-        latitudeCount = max(4, int((self.radius * 2) / gridAccuracy))
-        longitudeCount = max(8, int((self.radius * 2) / gridAccuracy))
+        latitudeCount = max(4, int((numpy.pi * self.radius) / gridAccuracy))
+        longitudeCount = max(8, int((2 * numpy.pi * self.radius) / gridAccuracy))
         # ^ finds the lat / long count for the grid accuracy, making it get smaller (bigger triangle/sections) as grid is bigger
+
+        self.latitudeCount = latitudeCount
+        self.longitudeCount = longitudeCount
+        # stored for triangle stage
 
         # creates a linspace of evenly spaced values from 0 to 1, split into latcount + 1 elements
         latitudeFractionArray = numpy.linspace(0.0, 1.0, latitudeCount + 1, dtype=numpy.float64)
@@ -145,6 +161,10 @@ class sphereObject:
         self.localYArray = localYGridArray.ravel()
         self.localZArray = localZGridArray.ravel()
 
+    def createSphereTriangles(self):
+        latitudeCount = self.latitudeCount
+        longitudeCount = self.longitudeCount
+
         pointsPerLatitudeRow = longitudeCount + 1
 
         latitudeIndexArray = numpy.arange(latitudeCount, dtype=numpy.int32)[:, None]
@@ -156,23 +176,22 @@ class sphereObject:
         bottomLeftIndexArray = ((latitudeIndexArray + 1) * pointsPerLatitudeRow) + longitudeIndexArray
         bottomRightIndexArray = bottomLeftIndexArray + 1
 
-        upperTriangleArray = numpy.stack((topLeftIndexArray,bottomLeftIndexArray,topRightIndexArray), axis=-1)
-
-        lowerTriangleArray = numpy.stack((topRightIndexArray,bottomLeftIndexArray,bottomRightIndexArray), axis=-1)
+        upperTriangleArray = numpy.stack((topLeftIndexArray, bottomLeftIndexArray, topRightIndexArray), axis=-1)
+        lowerTriangleArray = numpy.stack((topRightIndexArray, bottomLeftIndexArray, bottomRightIndexArray), axis=-1)
 
         validUpperLatitudeArray = numpy.arange(latitudeCount, dtype=numpy.int32) != 0
         validLowerLatitudeArray = numpy.arange(latitudeCount, dtype=numpy.int32) != (latitudeCount - 1)
-        # ^ excludes the evil triangles that shouldnt exist if they do
+        # ^ excludes the degenerate pole triangles that slipped through
 
         upperTriangleArray = upperTriangleArray[validUpperLatitudeArray, :, :]
         lowerTriangleArray = lowerTriangleArray[validLowerLatitudeArray, :, :]
-        # ^ removes the funky glitchy rows at the top and bottom 
+        # ^ removes the bad triangle rows at the top and bottom poles
 
         upperTriangleArray = upperTriangleArray.reshape(-1, 3)
         lowerTriangleArray = lowerTriangleArray.reshape(-1, 3)
         # ^ flattens both from 2d triangle grids into normal triangle lists
 
-        # stores the triangle mesh connectivity for direct plotting / rendering
+        
         self.triangleIndexArray = numpy.vstack((upperTriangleArray, lowerTriangleArray)).astype(numpy.int32)
 
 class flatPlaneObject:
@@ -190,7 +209,9 @@ class flatPlaneObject:
         self.height = None
         self.halfWidth = None
         self.halfHeight = None
+
         self.triangleIndexArray = numpy.array([], dtype=numpy.int32)
+
         self.localXArray = numpy.array([], dtype=numpy.float64)
         self.localYArray = numpy.array([], dtype=numpy.float64)
         self.localZArray = numpy.array([], dtype=numpy.float64)
@@ -210,16 +231,19 @@ class flatPlaneObject:
         self.halfWidth = width / 2
         self.halfHeight = height / 2
         # just makes a flat background object
+
         faceSize = (self.width, self.height)
-        self.localXArray, self.localYArray, self.localZArray, self.localUArray, self.localVArray, self.triangleIndexArray = self.createFace(faceSize, faceOffset, faceRotation)
-        
+
+        self.localXArray, self.localYArray, self.localZArray, self.localUArray, self.localVArray = self.cachePlanePoints(faceSize, faceOffset, faceRotation)
+        self.createPlaneTriangles()
+
         if self.image is not None:
             self.image = pygame.transform.scale(self.image, (self.width, self.height))
             # uses 3d array to display all images without losing color depth, 2d is faster by alot, if needed.
             # converts all to numpy data
             self.imagePixelArray = pygame.surfarray.array3d(self.image).astype(numpy.float64)
 
-    def createFace(self, faceSize, faceOffset, faceRotation):
+    def cachePlanePoints(self, faceSize, faceOffset, faceRotation):
         width, height = faceSize
         halfWidth = width / 2
         halfHeight = height / 2
@@ -242,8 +266,14 @@ class flatPlaneObject:
         gridAccuracy = self.world.gridAccuracy
 
         # all relative to object
-        xDistances = numpy.arange(-halfWidth, halfWidth, gridAccuracy, dtype=numpy.float64)
-        yDistances = numpy.arange(-halfHeight, halfHeight, gridAccuracy, dtype=numpy.float64)
+        xPointCount = int(width / gridAccuracy) + 1
+        yPointCount = int(height / gridAccuracy) + 1
+
+        xDistances = numpy.linspace(-halfWidth, halfWidth, xPointCount, dtype=numpy.float64)
+        yDistances = numpy.linspace(-halfHeight, halfHeight, yPointCount, dtype=numpy.float64)
+
+        self.rowLength = len(xDistances)
+        self.columnLength = len(yDistances)
 
         xLocation = numpy.tile(xDistances, len(yDistances))
         yLocation = numpy.repeat(yDistances, len(xDistances))
@@ -284,42 +314,32 @@ class flatPlaneObject:
         localZArray = localZArray + zOffset
         # all relative to object after face offset
 
-        rowLength = len(xDistances)
-        columnLength = len(yDistances)
-        
-        # works the same as lat/long for spheres, now just a plane instead
+        return localXArray, localYArray, localZArray, localUArray, localVArray
+
+    def createPlaneTriangles(self):
+        rowLength = self.rowLength
+        columnLength = self.columnLength
+
         rowArrayIndex = numpy.arange(columnLength - 1, dtype=numpy.int32)[:, None]
         columnArrayIndex = numpy.arange(rowLength - 1, dtype=numpy.int32)[None, :]
+        # each represents one box aka two triangles between two rows and two columns
 
         topLeftIndexArray = (rowArrayIndex * rowLength) + columnArrayIndex
         topRightIndexArray = topLeftIndexArray + 1
         bottomLeftIndexArray = ((rowArrayIndex + 1) * rowLength) + columnArrayIndex
         bottomRightIndexArray = bottomLeftIndexArray + 1
 
-        upperTriangleArray = numpy.stack((topLeftIndexArray,bottomLeftIndexArray,topRightIndexArray), axis=-1)
-
-        lowerTriangleArray = numpy.stack((topRightIndexArray,bottomLeftIndexArray,bottomRightIndexArray), axis=-1)
+        upperTriangleArray = numpy.stack((topLeftIndexArray, bottomLeftIndexArray, topRightIndexArray), axis=-1)
+        lowerTriangleArray = numpy.stack((topRightIndexArray, bottomLeftIndexArray, bottomRightIndexArray), axis=-1)
 
         upperTriangleArray = upperTriangleArray.reshape(-1, 3)
         lowerTriangleArray = lowerTriangleArray.reshape(-1, 3)
-        # ^ flattens both from 2d triangle grids into normal triangle lists
+        # flattens both from 2d triangle grids into normal triangle lists
 
-        # stores the triangle mesh connectivity for direct plotting / rendering
+        
         self.triangleIndexArray = numpy.vstack((upperTriangleArray, lowerTriangleArray)).astype(numpy.int32)
 
-        return localXArray, localYArray, localZArray, localUArray, localVArray, self.triangleIndexArray
 
-def matPlot(meshVertexArray,triangleFaceArray):
-
-    # shamelessly stole this example code so i could make sure my mesh rendered right without writing the lighting system
-    fig = matplotlib.pyplot.figure()
-    ax = fig.add_subplot(111, projection='3d')
-
-    ax.plot_trisurf(meshVertexArray[:, 0],meshVertexArray[:, 1],meshVertexArray[:, 2],triangles=triangleFaceArray,shade=True,color='w',edgecolor='k',linewidth=0.2)
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    matplotlib.pyplot.show()
 
 def main():
     pygame.init()
@@ -332,7 +352,7 @@ def main():
 
     backGroundColor = "black"
 
-    gridAccuracy = 10
+    gridAccuracy = 25
     focalLength = 500
     # projection
     ####################################################
@@ -383,6 +403,7 @@ def main():
     #print("sphere meshtime: " + str((endTime) - (startTime)))
 
     matPlot(planeVertexArray,planeTriangleFaceArray)
+    matPlot(sphereVertexArray,sphereTriangleFaceArray)
 
 
 
