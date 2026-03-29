@@ -190,7 +190,7 @@ class flatPlaneObject:
         self.height = None
         self.halfWidth = None
         self.halfHeight = None
-
+        self.triangleIndexArray = numpy.array([], dtype=numpy.int32)
         self.localXArray = numpy.array([], dtype=numpy.float64)
         self.localYArray = numpy.array([], dtype=numpy.float64)
         self.localZArray = numpy.array([], dtype=numpy.float64)
@@ -211,8 +211,8 @@ class flatPlaneObject:
         self.halfHeight = height / 2
         # just makes a flat background object
         faceSize = (self.width, self.height)
-        self.localXArray, self.localYArray, self.localZArray, self.localUArray, self.localVArray = self.createFace(faceSize, faceOffset, faceRotation)
-
+        self.localXArray, self.localYArray, self.localZArray, self.localUArray, self.localVArray, self.triangleIndexArray = self.createFace(faceSize, faceOffset, faceRotation)
+        
         if self.image is not None:
             self.image = pygame.transform.scale(self.image, (self.width, self.height))
             # uses 3d array to display all images without losing color depth, 2d is faster by alot, if needed.
@@ -284,7 +284,30 @@ class flatPlaneObject:
         localZArray = localZArray + zOffset
         # all relative to object after face offset
 
-        return localXArray, localYArray, localZArray, localUArray, localVArray
+        rowLength = len(xDistances)
+        columnLength = len(yDistances)
+        
+        # works the same as lat/long for spheres, now just a plane instead
+        rowArrayIndex = numpy.arange(columnLength - 1, dtype=numpy.int32)[:, None]
+        columnArrayIndex = numpy.arange(rowLength - 1, dtype=numpy.int32)[None, :]
+
+        topLeftIndexArray = (rowArrayIndex * rowLength) + columnArrayIndex
+        topRightIndexArray = topLeftIndexArray + 1
+        bottomLeftIndexArray = ((rowArrayIndex + 1) * rowLength) + columnArrayIndex
+        bottomRightIndexArray = bottomLeftIndexArray + 1
+
+        upperTriangleArray = numpy.stack((topLeftIndexArray,bottomLeftIndexArray,topRightIndexArray), axis=-1)
+
+        lowerTriangleArray = numpy.stack((topRightIndexArray,bottomLeftIndexArray,bottomRightIndexArray), axis=-1)
+
+        upperTriangleArray = upperTriangleArray.reshape(-1, 3)
+        lowerTriangleArray = lowerTriangleArray.reshape(-1, 3)
+        # ^ flattens both from 2d triangle grids into normal triangle lists
+
+        # stores the triangle mesh connectivity for direct plotting / rendering
+        self.triangleIndexArray = numpy.vstack((upperTriangleArray, lowerTriangleArray)).astype(numpy.int32)
+
+        return localXArray, localYArray, localZArray, localUArray, localVArray, self.triangleIndexArray
 
 def matPlot(meshVertexArray,triangleFaceArray):
 
@@ -292,7 +315,7 @@ def matPlot(meshVertexArray,triangleFaceArray):
     fig = matplotlib.pyplot.figure()
     ax = fig.add_subplot(111, projection='3d')
 
-    ax.plot_trisurf(meshVertexArray[:, 0],meshVertexArray[:, 1],meshVertexArray[:, 2],triangles=triangleFaceArray,shade=True,color='w',edgecolor='k',inewidth=0.2)
+    ax.plot_trisurf(meshVertexArray[:, 0],meshVertexArray[:, 1],meshVertexArray[:, 2],triangles=triangleFaceArray,shade=True,color='w',edgecolor='k',linewidth=0.2)
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
@@ -337,6 +360,7 @@ def main():
     #startTime = time.perf_counter()
     myPlane = flatPlaneObject((screenCenterX, windowHeight, 150), myWorld, None)
     myPlane.createPlane(windowWidth, 300, faceOffset=(0, 0, 0), faceRotation=(3.14159 / 2, 0, 0))
+
     #endTime = time.perf_counter()
     #print("Plane: " + str((endTime) - (startTime)))
 
@@ -346,16 +370,19 @@ def main():
     #print(str(len(planeWorldXArray)) + "   " + str(len(planeWorldYArray)) + "   " + str(len(planeWorldZArray)) )
     
 
-    startTime = time.perf_counter()
+    #startTime = time.perf_counter()
 
     # creates vertex array for the sphere mesh instead of cache then finding them
     
     sphereVertexArray = numpy.column_stack((sphereWorldXArray, sphereWorldYArray, sphereWorldZArray))
     sphereTriangleFaceArray = mySphere.triangleIndexArray
-    endTime = time.perf_counter()
-    print("sphere meshtime: " + str((endTime) - (startTime)))
 
-    matPlot(sphereVertexArray,sphereTriangleFaceArray)
+    planeVertexArray = numpy.column_stack((planeWorldXArray, planeWorldYArray, planeWorldZArray))
+    planeTriangleFaceArray = myPlane.triangleIndexArray
+    #endTime = time.perf_counter()
+    #print("sphere meshtime: " + str((endTime) - (startTime)))
+
+    matPlot(planeVertexArray,planeTriangleFaceArray)
 
 
 
