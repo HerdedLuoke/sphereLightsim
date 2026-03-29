@@ -1,12 +1,11 @@
 import pygame
-import math
 import cProfile
 import numpy
 import time
+import matplotlib.pyplot
+from mpl_toolkits import mplot3d
 
-# whos gonna eat the meats
-# lucas s,
-# true 3d rewrite to create... clipping. yay!
+# lucas!
 
 
 def getWorldPoints(myObject):
@@ -16,7 +15,6 @@ def getWorldPoints(myObject):
     worldZArray = myObject.localZArray + myObject.zLocation
 
     return worldXArray, worldYArray, worldZArray
-
 
 def getCameraPoints(myObject, myCamera):
     # all relative to origin
@@ -29,7 +27,6 @@ def getCameraPoints(myObject, myCamera):
 
     return relativeXArray, relativeYArray, relativeZArray
 
-
 def getScreenPoints(relativeXArray, relativeYArray, relativeZArray, myCamera):
     validPoint = relativeZArray > 0
 
@@ -38,7 +35,6 @@ def getScreenPoints(relativeXArray, relativeYArray, relativeZArray, myCamera):
     screenYArray = myCamera.screenCenterY - ((relativeYArray[validPoint] / relativeZArray[validPoint]) * myCamera.focalLength)
 
     return screenXArray, screenYArray, validPoint
-
 
 class lightObject:
     def __init__(self, intensity, lightPosition):
@@ -60,11 +56,9 @@ class lightObject:
     def lightUpdate(self, intensity):
         self.lightValue = intensity
 
-
 class worldObject:
     def __init__(self, gridAccuracy):
         self.gridAccuracy = gridAccuracy
-
 
 class cameraObject:
     def __init__(self, cameraPosition, focalLength, windowWidth, windowHeight):
@@ -75,6 +69,7 @@ class cameraObject:
         self.zLocation = self.position[2]
 
         self.focalLength = focalLength
+        # note this is used for fov 
 
         self.windowWidth = windowWidth
         self.windowHeight = windowHeight
@@ -88,7 +83,6 @@ class cameraObject:
         self.yLocation = self.position[1]
         self.zLocation = self.position[2]
 
-
 class sphereObject:
 
     def __init__(self, radius, worldPosition, world, textureFile=None):
@@ -101,11 +95,13 @@ class sphereObject:
 
         self.world = world
         self.cacheSpherePoints()
-
+        #print(len(self.localXArray))
+        #print(len(self.localYArray))
+        #print(len(self.localZArray))
         self.image = None
         self.imagePixelArray = None
 
-        if textureFile != None:
+        if textureFile is not None:
             self.image = pygame.image.load(textureFile).convert()
             self.image = pygame.transform.scale(self.image, (int(self.radius * 2), int(self.radius * 2)))
             # uses 3d array to display all images without losing color depth, 2d is faster by alot, if needed.
@@ -113,26 +109,71 @@ class sphereObject:
             self.imagePixelArray = pygame.surfarray.array3d(self.image).astype(numpy.float64)
 
     def cacheSpherePoints(self):
-        radiusSquared = self.radius ** 2
         gridAccuracy = self.world.gridAccuracy
 
+        # i hate this.
+        latitudeCount = max(4, int((self.radius * 2) / gridAccuracy))
+        longitudeCount = max(8, int((self.radius * 2) / gridAccuracy))
+        # ^ finds the lat / long count for the grid accuracy, making it get smaller (bigger triangle/sections) as grid is bigger
+
+        # creates a linspace of evenly spaced values from 0 to 1, split into latcount + 1 elements
+        latitudeFractionArray = numpy.linspace(0.0, 1.0, latitudeCount + 1, dtype=numpy.float64)
+        longitudeFractionArray = numpy.linspace(0.0, 1.0, longitudeCount + 1, dtype=numpy.float64)
+
+        phiValueArray = latitudeFractionArray * numpy.pi
+        thetaValueArray = longitudeFractionArray * (2 * numpy.pi)
+
+        # all relative to object in a 2d latitude / longitude layout
+        phiGridArray = phiValueArray[:, None]
+        thetaGridArray = thetaValueArray[None, :]
+        # ^ reshapes both into 2d broadcastable arrays, so phi changes by row and theta changes by column
+
+        # i love how nice vectorized code looks
+        sinPhiGridArray = numpy.sin(phiGridArray)
+        cosPhiGridArray = numpy.cos(phiGridArray)
+        # these could be meshed together instead, profile both later
+        cosThetaGridArray = numpy.cos(thetaGridArray)
+        sinThetaGridArray = numpy.sin(thetaGridArray)
+
+        localXGridArray = self.radius * sinPhiGridArray * cosThetaGridArray
+        localYGridArray = self.radius * sinPhiGridArray * sinThetaGridArray
+        localZGridArray = self.radius * cosPhiGridArray * numpy.ones_like(thetaGridArray)
+        # makes z match the full 2d latitude / longitude layout before flattening
+
         # all relative to object
-        xDistances = numpy.arange(-self.radius, self.radius, gridAccuracy, dtype=numpy.float64)
-        yDistances = numpy.arange(-self.radius, self.radius, gridAccuracy, dtype=numpy.float64)
+        self.localXArray = localXGridArray.ravel()
+        self.localYArray = localYGridArray.ravel()
+        self.localZArray = localZGridArray.ravel()
 
-        xLocation = numpy.tile(xDistances, len(yDistances))
-        yLocation = numpy.repeat(yDistances, len(xDistances))
-        # creates the same coordinate pair pattern as the old meshgrid+ravel setup
+        pointsPerLatitudeRow = longitudeCount + 1
 
-        distanceSumSq = (xLocation ** 2) + (yLocation ** 2)
-        validPoint = distanceSumSq <= radiusSquared
+        latitudeIndexArray = numpy.arange(latitudeCount, dtype=numpy.int32)[:, None]
+        longitudeIndexArray = numpy.arange(longitudeCount, dtype=numpy.int32)[None, :]
+        # each represents one box aka two triangles between two latitude rows and two longitude columns
 
-        zLocation = numpy.sqrt(numpy.clip(radiusSquared - distanceSumSq, 0, None))
+        topLeftIndexArray = (latitudeIndexArray * pointsPerLatitudeRow) + longitudeIndexArray
+        topRightIndexArray = topLeftIndexArray + 1
+        bottomLeftIndexArray = ((latitudeIndexArray + 1) * pointsPerLatitudeRow) + longitudeIndexArray
+        bottomRightIndexArray = bottomLeftIndexArray + 1
 
-        self.localXArray = xLocation[validPoint]
-        self.localYArray = yLocation[validPoint]
-        self.localZArray = zLocation[validPoint]
+        upperTriangleArray = numpy.stack((topLeftIndexArray,bottomLeftIndexArray,topRightIndexArray), axis=-1)
 
+        lowerTriangleArray = numpy.stack((topRightIndexArray,bottomLeftIndexArray,bottomRightIndexArray), axis=-1)
+
+        validUpperLatitudeArray = numpy.arange(latitudeCount, dtype=numpy.int32) != 0
+        validLowerLatitudeArray = numpy.arange(latitudeCount, dtype=numpy.int32) != (latitudeCount - 1)
+        # ^ excludes the evil triangles that shouldnt exist if they do
+
+        upperTriangleArray = upperTriangleArray[validUpperLatitudeArray, :, :]
+        lowerTriangleArray = lowerTriangleArray[validLowerLatitudeArray, :, :]
+        # ^ removes the funky glitchy rows at the top and bottom 
+
+        upperTriangleArray = upperTriangleArray.reshape(-1, 3)
+        lowerTriangleArray = lowerTriangleArray.reshape(-1, 3)
+        # ^ flattens both from 2d triangle grids into normal triangle lists
+
+        # stores the triangle mesh connectivity for direct plotting / rendering
+        self.triangleIndexArray = numpy.vstack((upperTriangleArray, lowerTriangleArray)).astype(numpy.int32)
 
 class flatPlaneObject:
     def __init__(self, worldPosition, world, textureFile=None):
@@ -245,6 +286,17 @@ class flatPlaneObject:
 
         return localXArray, localYArray, localZArray, localUArray, localVArray
 
+def matPlot(meshVertexArray,triangleFaceArray):
+
+    # shamelessly stole this example code so i could make sure my mesh rendered right without writing the lighting system
+    fig = matplotlib.pyplot.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    ax.plot_trisurf(meshVertexArray[:, 0],meshVertexArray[:, 1],meshVertexArray[:, 2],triangles=triangleFaceArray,shade=True,color='w',edgecolor='k',inewidth=0.2)
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    matplotlib.pyplot.show()
 
 def main():
     pygame.init()
@@ -257,7 +309,7 @@ def main():
 
     backGroundColor = "black"
 
-    gridAccuracy = 1
+    gridAccuracy = 10
     focalLength = 500
     # projection
     ####################################################
@@ -275,26 +327,50 @@ def main():
     myCamera = cameraObject((screenCenterX, screenCenterY, 0), focalLength, windowWidth, windowHeight)
     myLight = lightObject(100, (screenCenterX, screenCenterY, 100))
 
-    startTime = time.perf_counter()
+    #startTime = time.perf_counter()
     mySphere = sphereObject(100, (screenCenterX, screenCenterY, 200), myWorld, None)
-    endTime = time.perf_counter()
-    print("sphere: " + str((endTime) - (startTime)))
+    #endTime = time.perf_counter()
+    
+    
+    #print("sphere: " + str((endTime) - (startTime)))
 
-    startTime = time.perf_counter()
+    #startTime = time.perf_counter()
     myPlane = flatPlaneObject((screenCenterX, windowHeight, 150), myWorld, None)
     myPlane.createPlane(windowWidth, 300, faceOffset=(0, 0, 0), faceRotation=(3.14159 / 2, 0, 0))
-    endTime = time.perf_counter()
-    print("Plane: " + str((endTime) - (startTime)))
+    #endTime = time.perf_counter()
+    #print("Plane: " + str((endTime) - (startTime)))
 
     sphereWorldXArray, sphereWorldYArray, sphereWorldZArray = getWorldPoints(mySphere)
     planeWorldXArray, planeWorldYArray, planeWorldZArray = getWorldPoints(myPlane)
 
-    sphereCameraXArray, sphereCameraYArray, sphereCameraZArray = getCameraPoints(mySphere, myCamera)
-    planeCameraXArray, planeCameraYArray, planeCameraZArray = getCameraPoints(myPlane, myCamera)
+    #print(str(len(planeWorldXArray)) + "   " + str(len(planeWorldYArray)) + "   " + str(len(planeWorldZArray)) )
+    
 
-    sphereScreenXArray, sphereScreenYArray, sphereValidPoint = getScreenPoints(sphereCameraXArray, sphereCameraYArray, sphereCameraZArray, myCamera)
+    startTime = time.perf_counter()
 
-    planeScreenXArray, planeScreenYArray, planeValidPoint = getScreenPoints(planeCameraXArray, planeCameraYArray, planeCameraZArray, myCamera)
+    # creates vertex array for the sphere mesh instead of cache then finding them
+    
+    sphereVertexArray = numpy.column_stack((sphereWorldXArray, sphereWorldYArray, sphereWorldZArray))
+    sphereTriangleFaceArray = mySphere.triangleIndexArray
+    endTime = time.perf_counter()
+    print("sphere meshtime: " + str((endTime) - (startTime)))
+
+    matPlot(sphereVertexArray,sphereTriangleFaceArray)
+
+
+
+    
+
+
+
+
+
+
+
+    
+
+
+
 
     running = True
 
@@ -311,9 +387,20 @@ def main():
     pygame.font.quit()
     pygame.quit()
 
-
 testingMode = False
 if testingMode == True:
     cProfile.run("main()", sort="cumulative")
 else:
     main()
+
+
+
+# unused, dont want to delete tho
+
+#sphereCameraXArray, sphereCameraYArray, sphereCameraZArray = getCameraPoints(mySphere, myCamera)
+#planeCameraXArray, planeCameraYArray, planeCameraZArray = getCameraPoints(myPlane, myCamera)
+#sphereScreenXArray, sphereScreenYArray, sphereValidPoint = getScreenPoints(sphereCameraXArray, sphereCameraYArray, sphereCameraZArray, myCamera)
+#planeScreenXArray, planeScreenYArray, planeValidPoint = getScreenPoints(planeCameraXArray, planeCameraYArray, planeCameraZArray, myCamera)
+#startTime = time.perf_counter()
+#endTime = time.perf_counter()
+#print("plane meshtime: " + str((endTime) - (startTime)))
