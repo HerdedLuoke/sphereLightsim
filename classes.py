@@ -52,15 +52,20 @@ class cameraObject:
 
 class sphereObject:
         # UV STYLE SPHERE GENERATION
-    def __init__(self, radius, worldPosition, world, textureFile=None):
+    def __init__(self, radius, worldPosition, world, localGrid=None, textureFile=None):
         self.radius = radius
         self.position = (worldPosition[0], worldPosition[1], worldPosition[2])
-
+        
         self.xLocation = self.position[0]
         self.yLocation = self.position[1]
         self.zLocation = self.position[2]
-
         self.world = world
+
+        if localGrid != None:
+            self.gridAccuracy = localGrid
+        else:
+            self.gridAccuracy = self.world.gridAccuracy
+        
 
         self.cacheSpherePoints()
         self.createSphereTriangles()
@@ -76,7 +81,7 @@ class sphereObject:
             self.imagePixelArray = pygame.surfarray.array3d(self.image).astype(numpy.float64)
 
     def cacheSpherePoints(self):
-        gridAccuracy = self.world.gridAccuracy
+        gridAccuracy = self.gridAccuracy 
 
         # i hate this.
         latitudeCount = max(4, int((numpy.pi * self.radius) / gridAccuracy))
@@ -150,7 +155,7 @@ class sphereObject:
         self.triangleIndexArray = numpy.vstack((upperTriangleArray, lowerTriangleArray)).astype(numpy.int32)
 
 class flatPlaneObject:
-    def __init__(self, worldPosition, world, textureFile=None):
+    def __init__(self, worldPosition, world, localGrid=None, textureFile=None):
         # world position is the physical location relative to origin
         self.position = (worldPosition[0], worldPosition[1], worldPosition[2])
 
@@ -159,6 +164,11 @@ class flatPlaneObject:
         self.zLocation = self.position[2]
 
         self.world = world
+
+        if localGrid != None:
+            self.gridAccuracy = localGrid
+        else:
+            self.gridAccuracy = self.world.gridAccuracy
 
         self.width = None
         self.height = None
@@ -177,7 +187,7 @@ class flatPlaneObject:
         self.image = None
         self.imagePixelArray = None
 
-        if textureFile is not None:
+        if textureFile != None:
             self.image = pygame.image.load(textureFile).convert()
 
     def createPlane(self, width, height, faceOffset=(0, 0, 0), faceRotation=(0, 0, 0)):
@@ -218,7 +228,7 @@ class flatPlaneObject:
         cosZRotation = numpy.cos(zRotation)
         sinZRotation = numpy.sin(zRotation)
 
-        gridAccuracy = self.world.gridAccuracy
+        gridAccuracy = self.gridAccuracy
 
         # all relative to object
         xPointCount = int(width / gridAccuracy) + 1
