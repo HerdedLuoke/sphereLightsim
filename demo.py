@@ -1,8 +1,8 @@
 import cProfile
 import numpy
 
-from classesevil import *
-from evilfunctions import *
+from classes import *
+from functions import *
 
 
 def main():
