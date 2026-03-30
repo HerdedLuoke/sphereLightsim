@@ -13,7 +13,6 @@ def getWorldPoints(ptCld: pointCloud):
     # tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: 
     return worldXArray, worldYArray, worldZArray
 
-
 def getCameraPoints(ptCld: pointCloud, camera: camera):
     # all relative to origin
     worldXArray, worldYArray, worldZArray = getWorldPoints(ptCld)
@@ -26,7 +25,6 @@ def getCameraPoints(ptCld: pointCloud, camera: camera):
     # tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]:
     return relativeXArray, relativeYArray, relativeZArray
 
-
 def getScreenPoints(relativeXArray: numpy.ndarray, relativeYArray: numpy.ndarray,relativeZArray: numpy.ndarray, camera: camera):
     validPoint = relativeZArray > 0
 
@@ -36,7 +34,6 @@ def getScreenPoints(relativeXArray: numpy.ndarray, relativeYArray: numpy.ndarray
 
     # tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]
     return screenXArray, screenYArray, validPoint
-
 
 def createLocationData(ptCld: pointCloud, camera: camera, name: str):
     centerXArray = ptCld.localX
@@ -57,7 +54,6 @@ def createLocationData(ptCld: pointCloud, camera: camera, name: str):
         centerZ=centerZArray, worldX=worldXArray, worldY=worldYArray, worldZ=worldZArray,
         cameraX=cameraXArray, cameraY=cameraYArray, cameraZ=cameraZArray, screenX=fullScreenXArray,
         screenY=fullScreenYArray)
-
 
 def cacheSpherePoints(mySphere: sphere, name: str, myWorldGrid=None):
     if mySphere.grid != None:
@@ -107,69 +103,6 @@ def cacheSpherePoints(mySphere: sphere, name: str, myWorldGrid=None):
 
     # pointCloud, int, int
     return ptCld, latitudeCount, longitudeCount
-
-
-def createSphereTriangles(latitudeCount: int, longitudeCount: int):
-    pointsPerLatitudeRow = longitudeCount + 1
-
-    latitudeIndexArray = numpy.arange(latitudeCount, dtype=numpy.int32)[:, None]
-    longitudeIndexArray = numpy.arange(longitudeCount, dtype=numpy.int32)[None, :]
-    # each represents one box aka two triangles between two latitude rows and two longitude columns
-
-    topLeftIndexArray = (latitudeIndexArray * pointsPerLatitudeRow) + longitudeIndexArray
-    topRightIndexArray = topLeftIndexArray + 1
-    bottomLeftIndexArray = ((latitudeIndexArray + 1) * pointsPerLatitudeRow) + longitudeIndexArray
-    bottomRightIndexArray = bottomLeftIndexArray + 1
-
-    upperTriangleArray = numpy.stack((topLeftIndexArray, bottomLeftIndexArray, topRightIndexArray), axis=-1)
-    lowerTriangleArray = numpy.stack((topRightIndexArray, bottomLeftIndexArray, bottomRightIndexArray), axis=-1)
-
-    validUpperLatitudeArray = numpy.arange(latitudeCount, dtype=numpy.int32) != 0
-    validLowerLatitudeArray = numpy.arange(latitudeCount, dtype=numpy.int32) != (latitudeCount - 1)
-    # ^ excludes the evil pole triangles that slipped through
-
-    upperTriangleArray = upperTriangleArray[validUpperLatitudeArray, :, :]
-    lowerTriangleArray = lowerTriangleArray[validLowerLatitudeArray, :, :]
-    # ^ removes the bad triangle rows at the top and bottom poles
-
-    upperTriangleArray = upperTriangleArray.reshape(-1, 3)
-    lowerTriangleArray = lowerTriangleArray.reshape(-1, 3)
-    # ^ flattens both from 2d triangle grids into normal triangle lists
-
-    triangleIndexArray = numpy.vstack((upperTriangleArray, lowerTriangleArray)).astype(numpy.int32)
-
-    # numpy.ndarray
-    return triangleIndexArray
-
-
-def createSphereMesh(ptCld: pointCloud, triangleIndexArray: numpy.ndarray, name: str):
-    vertexArray = numpy.column_stack((ptCld.localX, ptCld.localY, ptCld.localZ)).astype(numpy.float64)
-
-    return mesh(shape="sphere", vertices=vertexArray, indexes=triangleIndexArray)
-
-
-def loadSphereTexture(mySphere: sphere):
-    image = None
-    imagePixelArray = None
-
-    if mySphere.texture != None:
-        image = pygame.image.load(mySphere.texture).convert()
-        image = pygame.transform.scale(image, (int(mySphere.radius * 2), int(mySphere.radius * 2)))
-        # uses 3d array to display all images without losing color depth, 2d is faster by alot, if needed.
-        # converts all to numpy data
-        imagePixelArray = pygame.surfarray.array3d(image).astype(numpy.float64)
-
-    return image, imagePixelArray
-
-
-def buildSphere(mySphere: sphere, myWorldGrid=None):
-    ptCld, latitudeCount, longitudeCount = cacheSpherePoints(mySphere, mySphere.name, myWorldGrid)
-    triangleIndexArray = createSphereTriangles(latitudeCount, longitudeCount)
-    meshObj = createSphereMesh(ptCld, triangleIndexArray, mySphere.name)
-
-    return sphere(name=mySphere.name, grid=mySphere.grid, radius=mySphere.radius, position=mySphere.position,
-        texture=mySphere.texture, color=mySphere.color, pointCloud=ptCld, mesh=meshObj)
-
 
 def cachePlanePoints(myPlane: plane, name: str, myWorldGrid=None, faceOffset=(0, 0, 0),faceRotation=None):
     width = myPlane.width
@@ -257,6 +190,37 @@ def cachePlanePoints(myPlane: plane, name: str, myWorldGrid=None, faceOffset=(0,
 
     return ptCld, rowLength, columnLength
 
+def createSphereTriangles(latitudeCount: int, longitudeCount: int):
+    pointsPerLatitudeRow = longitudeCount + 1
+
+    latitudeIndexArray = numpy.arange(latitudeCount, dtype=numpy.int32)[:, None]
+    longitudeIndexArray = numpy.arange(longitudeCount, dtype=numpy.int32)[None, :]
+    # each represents one box aka two triangles between two latitude rows and two longitude columns
+
+    topLeftIndexArray = (latitudeIndexArray * pointsPerLatitudeRow) + longitudeIndexArray
+    topRightIndexArray = topLeftIndexArray + 1
+    bottomLeftIndexArray = ((latitudeIndexArray + 1) * pointsPerLatitudeRow) + longitudeIndexArray
+    bottomRightIndexArray = bottomLeftIndexArray + 1
+
+    upperTriangleArray = numpy.stack((topLeftIndexArray, bottomLeftIndexArray, topRightIndexArray), axis=-1)
+    lowerTriangleArray = numpy.stack((topRightIndexArray, bottomLeftIndexArray, bottomRightIndexArray), axis=-1)
+
+    validUpperLatitudeArray = numpy.arange(latitudeCount, dtype=numpy.int32) != 0
+    validLowerLatitudeArray = numpy.arange(latitudeCount, dtype=numpy.int32) != (latitudeCount - 1)
+    # ^ excludes the evil pole triangles that slipped through
+
+    upperTriangleArray = upperTriangleArray[validUpperLatitudeArray, :, :]
+    lowerTriangleArray = lowerTriangleArray[validLowerLatitudeArray, :, :]
+    # ^ removes the bad triangle rows at the top and bottom poles
+
+    upperTriangleArray = upperTriangleArray.reshape(-1, 3)
+    lowerTriangleArray = lowerTriangleArray.reshape(-1, 3)
+    # ^ flattens both from 2d triangle grids into normal triangle lists
+
+    triangleIndexArray = numpy.vstack((upperTriangleArray, lowerTriangleArray)).astype(numpy.int32)
+
+    # numpy.ndarray
+    return triangleIndexArray
 
 def createPlaneTriangles(rowLength: int, columnLength: int):
     rowArrayIndex = numpy.arange(columnLength - 1, dtype=numpy.int32)[:, None]
@@ -279,12 +243,28 @@ def createPlaneTriangles(rowLength: int, columnLength: int):
 
     return triangleIndexArray
 
+def createSphereMesh(ptCld: pointCloud, triangleIndexArray: numpy.ndarray, name: str):
+    vertexArray = numpy.column_stack((ptCld.localX, ptCld.localY, ptCld.localZ)).astype(numpy.float64)
+
+    return mesh(shape="sphere", vertices=vertexArray, indexes=triangleIndexArray)
 
 def createPlaneMesh(ptCld: pointCloud, triangleIndexArray: numpy.ndarray, name: str):
     vertexArray = numpy.column_stack((ptCld.localX, ptCld.localY, ptCld.localZ)).astype(numpy.float64)
 
     return mesh(shape="plane", vertices=vertexArray, indexes=triangleIndexArray)
 
+def loadSphereTexture(mySphere: sphere):
+    image = None
+    imagePixelArray = None
+
+    if mySphere.texture != None:
+        image = pygame.image.load(mySphere.texture).convert()
+        image = pygame.transform.scale(image, (int(mySphere.radius * 2), int(mySphere.radius * 2)))
+        # uses 3d array to display all images without losing color depth, 2d is faster by alot, if needed.
+        # converts all to numpy data
+        imagePixelArray = pygame.surfarray.array3d(image).astype(numpy.float64)
+
+    return image, imagePixelArray
 
 def loadPlaneTexture(myPlane: plane):
     image = None
@@ -299,6 +279,13 @@ def loadPlaneTexture(myPlane: plane):
 
     return image, imagePixelArray
 
+def createSphere(mySphere: sphere, myWorldGrid=None):
+    ptCld, latitudeCount, longitudeCount = cacheSpherePoints(mySphere, mySphere.name, myWorldGrid)
+    triangleIndexArray = createSphereTriangles(latitudeCount, longitudeCount)
+    meshObj = createSphereMesh(ptCld, triangleIndexArray, mySphere.name)
+
+    return sphere(name=mySphere.name, grid=mySphere.grid, radius=mySphere.radius, position=mySphere.position,
+        texture=mySphere.texture, color=mySphere.color, pointCloud=ptCld, mesh=meshObj)
 
 def createPlane(myPlane: plane, myWorldGrid=None, faceOffset=(0, 0, 0), faceRotation=None):
     ptCld, rowLength, columnLength = cachePlanePoints(myPlane, myPlane.name, myWorldGrid, faceOffset, faceRotation)
