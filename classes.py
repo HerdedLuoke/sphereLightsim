@@ -39,7 +39,7 @@ class pointCloud:
     localX: numpy.ndarray[numpy.float64]
     localY: numpy.ndarray[numpy.float64]
     localZ: numpy.ndarray[numpy.float64]
-    location: "location" | None = None
+    location: "location" 
     localU: numpy.ndarray[numpy.float64] | None = None
     localV: numpy.ndarray[numpy.float64] | None = None
 
@@ -70,7 +70,7 @@ class sphere:
     position: tuple[float, float, float]
     texture: str | None = None
     color: str | None = None
-    pointCloud: pointCloud | None = None
+    pointCloud: pointCloud
     mesh: mesh | None = None
 
 
