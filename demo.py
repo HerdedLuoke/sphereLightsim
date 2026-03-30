@@ -1,8 +1,9 @@
 import cProfile
 import numpy
 
-from classes import worldObject, flatPlaneObject
-from functions import getWorldPoints, matPlot
+from classesevil import *
+from evilfunctions import *
+
 
 def main():
 
@@ -19,9 +20,8 @@ def main():
     screenCenterX = windowWidth / 2
     screenCenterY = windowHeight / 2
 
-
     # scene objects
-    myWorld = worldObject(gridAccuracy)
+    myWorld = worldGrid(type=None, size=gridAccuracy)
 
     boxSize = 100
     halfBoxSize = boxSize / 2
@@ -34,34 +34,34 @@ def main():
 
     frontFaceZLocation = cubeCenterZ + halfBoxSize
 
-    #front +z
-    frontPlane = flatPlaneObject((cubeCenterX, cubeCenterY, frontFaceZLocation), myWorld, 5)
-    frontPlane.createPlane(boxSize, boxSize, faceRotation=(0, numpy.pi, 0))
+    # front z
+    frontPlane = plane(name="frontPlane", grid=20, position=(cubeCenterX, cubeCenterY, frontFaceZLocation), rotation=(0, numpy.pi, 0), width=boxSize, height=boxSize)
+    frontPlane = createPlane(frontPlane, myWorld)
     objectList.append(frontPlane)
 
-    # back -z
-    backPlane = flatPlaneObject((cubeCenterX, cubeCenterY, frontFaceZLocation - boxSize), myWorld, 25)
-    backPlane.createPlane(boxSize, boxSize)
+    # back
+    backPlane = plane(name="backPlane", grid=20, position=(cubeCenterX, cubeCenterY, frontFaceZLocation - boxSize), rotation=(0, 0, 0), width=boxSize, height=boxSize)
+    backPlane = createPlane(backPlane, myWorld)
     objectList.append(backPlane)
 
-    #left -x
-    leftPlane = flatPlaneObject((cubeCenterX - halfBoxSize, cubeCenterY, cubeCenterZ), myWorld, 30)
-    leftPlane.createPlane(boxSize, boxSize, faceRotation=(0, numpy.pi / 2, 0))
+    # -x
+    leftPlane = plane(name="leftPlane", grid=20, position=(cubeCenterX - halfBoxSize, cubeCenterY, cubeCenterZ), rotation=(0, numpy.pi / 2, 0), width=boxSize, height=boxSize)
+    leftPlane = createPlane(leftPlane, myWorld)
     objectList.append(leftPlane)
 
-    # right x
-    rightPlane = flatPlaneObject((cubeCenterX + halfBoxSize, cubeCenterY, cubeCenterZ), myWorld, 60)
-    rightPlane.createPlane(boxSize, boxSize, faceRotation=(0, -numpy.pi / 2, 0))
+    # x
+    rightPlane = plane(name="rightPlane", grid=20, position=(cubeCenterX + halfBoxSize, cubeCenterY, cubeCenterZ), rotation=(0, -numpy.pi / 2, 0), width=boxSize, height=boxSize)
+    rightPlane = createPlane(rightPlane, myWorld)
     objectList.append(rightPlane)
 
-    #top y
-    topPlane = flatPlaneObject((cubeCenterX, cubeCenterY + halfBoxSize, cubeCenterZ), myWorld, 30)
-    topPlane.createPlane(boxSize, boxSize, faceRotation=(numpy.pi / 2, 0, 0))
+    # y
+    topPlane = plane(name="topPlane", grid=20, position=(cubeCenterX, cubeCenterY + halfBoxSize, cubeCenterZ), rotation=(numpy.pi / 2, 0, 0), width=boxSize, height=boxSize)
+    topPlane = createPlane(topPlane, myWorld)
     objectList.append(topPlane)
 
-    #bottom -y
-    bottomPlane = flatPlaneObject((cubeCenterX, cubeCenterY - halfBoxSize, cubeCenterZ), myWorld, 15)
-    bottomPlane.createPlane(boxSize, boxSize, faceRotation=(-numpy.pi / 2, 0, 0))
+    # -y
+    bottomPlane = plane(name="bottomPlane", grid=20, position=(cubeCenterX, cubeCenterY - halfBoxSize, cubeCenterZ), rotation=(-numpy.pi / 2, 0, 0), width=boxSize, height=boxSize)
+    bottomPlane = createPlane(bottomPlane, myWorld)
     objectList.append(bottomPlane)
 
     combinedVertexList = []
@@ -70,10 +70,10 @@ def main():
     vertexOffset = 0
 
     for currentObject in objectList:
-        worldXArray, worldYArray, worldZArray = getWorldPoints(currentObject)
+        worldXArray, worldYArray, worldZArray = getWorldPoints(currentObject.pointCloud)
 
         currentVertexArray = numpy.column_stack((worldXArray, worldYArray, worldZArray))
-        currentTriangleArray = currentObject.triangleIndexArray
+        currentTriangleArray = currentObject.mesh.indexes
 
         combinedVertexList.append(currentVertexArray)
         combinedTriangleList.append(currentTriangleArray + vertexOffset)
@@ -86,12 +86,9 @@ def main():
     matPlot(combinedVertexArray, combinedTriangleArray)
     # grabs all of the different planes, makes one list of triangles and their verticies, then passes
 
-   
-
-
 
 testingMode = False
 if testingMode == True:
-    cProfile.run("main()", sort="cumulative")
+    cProfile.run("main()", sort="tottime")
 else:
     main()
