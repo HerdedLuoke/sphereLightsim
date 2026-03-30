@@ -1,3 +1,5 @@
+this main is not the most updated, use release or numpy-3d... for most updated version
+
 whos gonna eat the meats
 
  use up/down key to move light on the z axis, top left shows ur z axis cord. starts (radius) away
