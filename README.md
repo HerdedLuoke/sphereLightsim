@@ -1,4 +1,4 @@
-this main is not the most updated, use release or numpy-3d... for most updated version
+# this main is not the most updated, use release or numpy-3d... for most updated version
 
 whos gonna eat the meats
 
