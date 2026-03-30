@@ -64,8 +64,19 @@ def main():
     bottomPlane = createPlane(bottomPlane, myWorld)
     objectList.append(bottomPlane)
 
+    
+    bigOlsphere = sphere(name="incrediblyEvil",grid=10,radius=50,position=(0,0,0))
+    bigOlsphere = createSphere(bigOlsphere)
+    
+    worldXArray, worldYArray, worldZArray = getWorldPoints(bigOlsphere.pointCloud)
+    sphereVertexArray = numpy.column_stack((worldXArray, worldYArray, worldZArray))
+    sphereTriangleArray = bigOlsphere.mesh.indexes
+
+    matPlot(sphereVertexArray, sphereTriangleArray)
+
     combinedVertexList = []
     combinedTriangleList = []
+
 
     vertexOffset = 0
 
