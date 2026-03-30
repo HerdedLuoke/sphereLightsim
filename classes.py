@@ -46,6 +46,7 @@ class pointCloud:
 
 @dataclass(frozen=True)
 class location:
+    # might not ever use this but made it incase i have to warp points enmass
     name: str
     parent: "pointCloud"
     # location relative to center of parent
