@@ -34,18 +34,20 @@ class mesh:
 
 @dataclass
 class pointCloud:
+    name: str
     shape: str
     center: tuple[float, float, float]
     localX: numpy.ndarray[numpy.float64]
     localY: numpy.ndarray[numpy.float64]
     localZ: numpy.ndarray[numpy.float64]
-    location: "location" 
+    location: "location"
     localU: numpy.ndarray[numpy.float64] | None = None
     localV: numpy.ndarray[numpy.float64] | None = None
 
 @dataclass(frozen=True)
 class location:
-    parent: pointCloud
+    name: str
+    parent: "pointCloud"
     # location relative to center of parent
     centerX: numpy.ndarray[numpy.float64]
     centerY: numpy.ndarray[numpy.float64]
@@ -70,7 +72,7 @@ class sphere:
     position: tuple[float, float, float]
     texture: str | None = None
     color: str | None = None
-    pointCloud: pointCloud
+    pointCloud: pointCloud | None = None
     mesh: mesh | None = None
 
 
