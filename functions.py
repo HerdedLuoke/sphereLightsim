@@ -59,18 +59,18 @@ def createLocationData(ptCld: pointCloud, camera: camera, name: str):
         screenY=fullScreenYArray)
 
 
-def cacheSpherePoints(sphere: sphere, name: str, worldGrid=None):
-    if sphere.grid != None:
-        if isinstance(sphere.grid, worldGrid):
-            gridAccuracy = sphere.grid.size
+def cacheSpherePoints(mySphere: sphere, name: str, myWorldGrid=None):
+    if mySphere.grid != None:
+        if isinstance(mySphere.grid, worldGrid):
+            gridAccuracy = mySphere.grid.size
         else:
-            gridAccuracy = sphere.grid
+            gridAccuracy = mySphere.grid
     else:
-        gridAccuracy = worldGrid.size
+        gridAccuracy = myWorldGrid.size
 
     # i hate this.
-    latitudeCount = max(4, int((numpy.pi * sphere.radius) / gridAccuracy))
-    longitudeCount = max(8, int((2 * numpy.pi * sphere.radius) / gridAccuracy))
+    latitudeCount = max(4, int((numpy.pi * mySphere.radius) / gridAccuracy))
+    longitudeCount = max(8, int((2 * numpy.pi * mySphere.radius) / gridAccuracy))
     # ^ finds the lat / long count for the grid accuracy, making it get smaller (bigger triangle/sections) as grid is bigger
 
     # creates a linspace of evenly spaced values from 0 to 1, split into latcount + 1 elements
@@ -92,9 +92,9 @@ def cacheSpherePoints(sphere: sphere, name: str, worldGrid=None):
     cosThetaGridArray = numpy.cos(thetaGridArray)
     sinThetaGridArray = numpy.sin(thetaGridArray)
 
-    localXGridArray = sphere.radius * sinPhiGridArray * cosThetaGridArray
-    localYGridArray = sphere.radius * sinPhiGridArray * sinThetaGridArray
-    localZGridArray = sphere.radius * cosPhiGridArray * numpy.ones_like(thetaGridArray)
+    localXGridArray = mySphere.radius * sinPhiGridArray * cosThetaGridArray
+    localYGridArray = mySphere.radius * sinPhiGridArray * sinThetaGridArray
+    localZGridArray = mySphere.radius * cosPhiGridArray * numpy.ones_like(thetaGridArray)
     # makes z match the full 2d latitude / longitude layout before flattening
 
     # all relative to object
@@ -102,7 +102,7 @@ def cacheSpherePoints(sphere: sphere, name: str, worldGrid=None):
     localYArray = localYGridArray.ravel()
     localZArray = localZGridArray.ravel()
 
-    ptCld = pointCloud(name=str(name), shape="sphere", center=sphere.position, localX=localXArray,
+    ptCld = pointCloud(name=str(name), shape="sphere", center=mySphere.position, localX=localXArray,
         localY=localYArray, localZ=localZArray, location=None)
 
     # pointCloud, int, int
@@ -145,16 +145,16 @@ def createSphereTriangles(latitudeCount: int, longitudeCount: int):
 def createSphereMesh(ptCld: pointCloud, triangleIndexArray: numpy.ndarray, name: str):
     vertexArray = numpy.column_stack((ptCld.localX, ptCld.localY, ptCld.localZ)).astype(numpy.float64)
 
-    return mesh(name=str(name), shape="sphere", vertices=vertexArray, indexes=triangleIndexArray)
+    return mesh(shape="sphere", vertices=vertexArray, indexes=triangleIndexArray)
 
 
-def loadSphereTexture(sphere: sphere):
+def loadSphereTexture(mySphere: sphere):
     image = None
     imagePixelArray = None
 
-    if sphere.texture != None:
-        image = pygame.image.load(sphere.texture).convert()
-        image = pygame.transform.scale(image, (int(sphere.radius * 2), int(sphere.radius * 2)))
+    if mySphere.texture != None:
+        image = pygame.image.load(mySphere.texture).convert()
+        image = pygame.transform.scale(image, (int(mySphere.radius * 2), int(mySphere.radius * 2)))
         # uses 3d array to display all images without losing color depth, 2d is faster by alot, if needed.
         # converts all to numpy data
         imagePixelArray = pygame.surfarray.array3d(image).astype(numpy.float64)
@@ -162,18 +162,18 @@ def loadSphereTexture(sphere: sphere):
     return image, imagePixelArray
 
 
-def buildSphere(sphere: sphere, worldGrid=None):
-    ptCld, latitudeCount, longitudeCount = cacheSpherePoints(sphere, sphere.name, worldGrid)
+def buildSphere(mySphere: sphere, myWorldGrid=None):
+    ptCld, latitudeCount, longitudeCount = cacheSpherePoints(mySphere, mySphere.name, myWorldGrid)
     triangleIndexArray = createSphereTriangles(latitudeCount, longitudeCount)
-    mesh = createSphereMesh(ptCld, triangleIndexArray, sphere.name)
+    meshObj = createSphereMesh(ptCld, triangleIndexArray, mySphere.name)
 
-    return sphere(name=sphere.name, grid=sphere.grid, radius=sphere.radius, position=sphere.position,
-        texture=sphere.texture, color=sphere.color, pointCloud=ptCld, mesh=mesh)
+    return sphere(name=mySphere.name, grid=mySphere.grid, radius=mySphere.radius, position=mySphere.position,
+        texture=mySphere.texture, color=mySphere.color, pointCloud=ptCld, mesh=meshObj)
 
 
-def cachePlanePoints(plane: plane, name: str, worldGrid=None, faceOffset=(0, 0, 0),faceRotation=None):
-    width = plane.width
-    height = plane.height
+def cachePlanePoints(myPlane: plane, name: str, myWorldGrid=None, faceOffset=(0, 0, 0),faceRotation=None):
+    width = myPlane.width
+    height = myPlane.height
     halfWidth = width / 2
     halfHeight = height / 2
 
@@ -182,9 +182,9 @@ def cachePlanePoints(plane: plane, name: str, worldGrid=None, faceOffset=(0, 0, 
     # offset is for placing MULTIPLE planes within one object, not needed if u dont wanna
 
     if faceRotation == None:
-        xRotation = plane.rotation[0]
-        yRotation = plane.rotation[1]
-        zRotation = plane.rotation[2]
+        xRotation = myPlane.rotation[0]
+        yRotation = myPlane.rotation[1]
+        zRotation = myPlane.rotation[2]
     else:
         xRotation = faceRotation[0]
         yRotation = faceRotation[1]
@@ -197,13 +197,13 @@ def cachePlanePoints(plane: plane, name: str, worldGrid=None, faceOffset=(0, 0, 
     cosZRotation = numpy.cos(zRotation)
     sinZRotation = numpy.sin(zRotation)
 
-    if plane.grid != None:
-        if isinstance(plane.grid, worldGrid):
-            gridAccuracy = plane.grid.size
+    if myPlane.grid != None:
+        if isinstance(myPlane.grid, worldGrid):
+            gridAccuracy = myPlane.grid.size
         else:
-            gridAccuracy = plane.grid
+            gridAccuracy = myPlane.grid
     else:
-        gridAccuracy = worldGrid.size
+        gridAccuracy = myWorldGrid.size
 
     # all relative to object
     xPointCount = int(width / gridAccuracy) + 1
@@ -253,7 +253,7 @@ def cachePlanePoints(plane: plane, name: str, worldGrid=None, faceOffset=(0, 0, 
     localZArray = localZArray + zOffset
     # all relative to object after face offset
 
-    ptCld = pointCloud(name=str(name), shape="plane", center=plane.position, localX=localXArray,localY=localYArray, localZ=localZArray, location=None, localU=localUArray, localV=localVArray)
+    ptCld = pointCloud(name=str(name), shape="plane", center=myPlane.position, localX=localXArray,localY=localYArray, localZ=localZArray, location=None, localU=localUArray, localV=localVArray)
 
     return ptCld, rowLength, columnLength
 
@@ -283,16 +283,16 @@ def createPlaneTriangles(rowLength: int, columnLength: int):
 def createPlaneMesh(ptCld: pointCloud, triangleIndexArray: numpy.ndarray, name: str):
     vertexArray = numpy.column_stack((ptCld.localX, ptCld.localY, ptCld.localZ)).astype(numpy.float64)
 
-    return mesh(name=str(name), shape="plane", vertices=vertexArray, indexes=triangleIndexArray)
+    return mesh(shape="plane", vertices=vertexArray, indexes=triangleIndexArray)
 
 
-def loadPlaneTexture(plane: plane):
+def loadPlaneTexture(myPlane: plane):
     image = None
     imagePixelArray = None
 
-    if plane.texture != None:
-        image = pygame.image.load(plane.texture).convert()
-        image = pygame.transform.scale(image, (int(plane.width), int(plane.height)))
+    if myPlane.texture != None:
+        image = pygame.image.load(myPlane.texture).convert()
+        image = pygame.transform.scale(image, (int(myPlane.width), int(myPlane.height)))
         # uses 3d array to display all images without losing color depth, 2d is faster by alot, if needed.
         # converts all to numpy data
         imagePixelArray = pygame.surfarray.array3d(image).astype(numpy.float64)
@@ -300,12 +300,12 @@ def loadPlaneTexture(plane: plane):
     return image, imagePixelArray
 
 
-def createPlane(plane: plane, worldGrid=None, faceOffset=(0, 0, 0), faceRotation=None):
-    ptCld, rowLength, columnLength = cachePlanePoints(plane, plane.name, worldGrid, faceOffset, faceRotation)
+def createPlane(myPlane: plane, myWorldGrid=None, faceOffset=(0, 0, 0), faceRotation=None):
+    ptCld, rowLength, columnLength = cachePlanePoints(myPlane, myPlane.name, myWorldGrid, faceOffset, faceRotation)
     triangleIndexArray = createPlaneTriangles(rowLength, columnLength)
-    mesh = createPlaneMesh(ptCld, triangleIndexArray, plane.name)
+    meshObj = createPlaneMesh(ptCld, triangleIndexArray, myPlane.name)
 
-    return plane(name=plane.name, grid=plane.grid, position=plane.position, rotation=plane.rotation,width=plane.width, height=plane.height, texture=plane.texture, color=plane.color,pointCloud=ptCld, mesh=mesh)
+    return plane(name=myPlane.name, grid=myPlane.grid, position=myPlane.position, rotation=myPlane.rotation,width=myPlane.width, height=myPlane.height, texture=myPlane.texture, color=myPlane.color,pointCloud=ptCld, mesh=meshObj)
 
 def matPlot(meshVertexArray,triangleFaceArray):
 
