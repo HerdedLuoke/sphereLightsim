@@ -1,5 +1,5 @@
 import matplotlib.pyplot
-from classesevil import *
+from classes import *
 import numpy
 import pygame
 
