@@ -45,7 +45,7 @@ class pointCloud:
 
 @dataclass(frozen=True)
 class location:
-    parent: "pointCloud"
+    parent: pointCloud
     # location relative to center of parent
     centerX: numpy.ndarray[numpy.float64]
     centerY: numpy.ndarray[numpy.float64]
