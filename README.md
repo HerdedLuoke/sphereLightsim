@@ -1,4 +1,5 @@
-whos gonna eat the meats
+# pip3 guy
+pip3 install matplotlib, numpy, pygame-ce
 
  use up/down key to move light on the z axis, top left shows ur z axis cord. starts (radius) away
 
