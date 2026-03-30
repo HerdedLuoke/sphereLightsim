@@ -67,11 +67,15 @@ def main():
     
 
     # ex of not explitly as possible written out (im very guilty of being way to explicit)
-    bigOlsphere = createSphere(sphere(name="incrediblyEvil", grid=10, radius=50, position=(0, 0, 0)))
-    sphereVertexArray = numpy.column_stack(getWorldPoints(bigOlsphere.pointCloud))
-    matPlot(sphereVertexArray, bigOlsphere.mesh.indexes)
+    #bigOlsphere = createSphere(sphere(name="incrediblyEvil", grid=10, radius=50, position=(0, 0, 0)))
+    #sphereVertexArray = numpy.column_stack(getWorldPoints(bigOlsphere.pointCloud))
+    #matPlot(sphereVertexArray, bigOlsphere.mesh.indexes)
+
+    # me when jimmy from i hate readable code says my code SUCKS
+    matPlot(numpy.column_stack(getWorldPoints((createSphere(sphere(name="incrediblyEvil", grid=10, radius=50, position=(0, 0, 0)))).pointCloud)), (createSphere(sphere(name="incrediblyEvil", grid=10, radius=50, position=(0, 0, 0)))).mesh.indexes)
 
 
+    
 
 
 
