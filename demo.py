@@ -65,14 +65,18 @@ def main():
     objectList.append(bottomPlane)
 
     
-    bigOlsphere = sphere(name="incrediblyEvil",grid=10,radius=50,position=(0,0,0))
-    bigOlsphere = createSphere(bigOlsphere)
-    
-    worldXArray, worldYArray, worldZArray = getWorldPoints(bigOlsphere.pointCloud)
-    sphereVertexArray = numpy.column_stack((worldXArray, worldYArray, worldZArray))
-    sphereTriangleArray = bigOlsphere.mesh.indexes
 
-    matPlot(sphereVertexArray, sphereTriangleArray)
+    # ex of not explitly as possible written out (im very guilty of being way to explicit)
+    bigOlsphere = createSphere(sphere(name="incrediblyEvil", grid=10, radius=50, position=(0, 0, 0)))
+    sphereVertexArray = numpy.column_stack(getWorldPoints(bigOlsphere.pointCloud))
+    matPlot(sphereVertexArray, bigOlsphere.mesh.indexes)
+
+
+
+
+
+
+
 
     combinedVertexList = []
     combinedTriangleList = []
@@ -95,7 +99,7 @@ def main():
     combinedTriangleArray = numpy.vstack(combinedTriangleList)
 
     matPlot(combinedVertexArray, combinedTriangleArray)
-    # grabs all of the different planes, makes one list of triangles and their verticies, then passes
+    # grabs all of the different planes, makes one list of triangles and their vertices, then passes
 
 
 testingMode = False
